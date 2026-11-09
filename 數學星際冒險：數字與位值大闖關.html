@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>數學星際冒險：數字與位值大闖關</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+  * {
+    font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  
+  /* 炫麗太空流星背景 */
+  body {
+    background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  .star-field {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+      radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.7), rgba(0,0,0,0)),
+      radial-gradient(1px 1px at 90px 40px, #ffffff, rgba(0,0,0,0)),
+      radial-gradient(2px 2px at 160px 120px, #ffd166, rgba(0,0,0,0)),
+      radial-gradient(2px 2px at 240px 180px, #06d6a0, rgba(0,0,0,0)),
+      radial-gradient(3px 3px at 320px 220px, #118ab2, rgba(0,0,0,0));
+    background-repeat: repeat;
+    background-size: 350px 350px;
+    opacity: 0.6;
+    z-index: 0;
+  }
+
+  /* 彈跳震動動畫 */
+  @keyframes shakeGacha {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    20% { transform: translate(-4px, 4px) rotate(-3deg); }
+    40% { transform: translate(4px, -3px) rotate(3deg); }
+    60% { transform: translate(-3px, 2px) rotate(-2deg); }
+    80% { transform: translate(3px, -2px) rotate(2deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+
+  .gacha-shaking {
+    animation: shakeGacha 0.5s infinite;
+  }
+
+  @keyframes floatSlow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  .floating-hero {
+    animation: floatSlow 3.2s ease-in-out infinite;
+  }
+
+  @keyframes popBall {
+    0% { transform: scale(0.2) translateY(80px); opacity: 0; }
+    70% { transform: scale(1.15) translateY(-10px); opacity: 1; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  .pop-ball-anim {
+    animation: popBall 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+
+  /* 3D 立體按鈕反饋 */
+  .btn-3d {
+    transition: all 0.1s ease;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.25);
+  }
+  .btn-3d:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.25);
+  }
+</style>
+</head>
+<body class="text-white flex flex-col items-center justify-between p-3 md:p-6 relative select-none">
+<div class="star-field"></div>
+
+<!-- 頂部控制面板 -->
+<header class="w-full max-w-4xl bg-slate-800/80 backdrop-blur-md border-2 border-indigo-400/40 rounded-3xl p-4 mb-4 shadow-2xl flex flex-wrap justify-between items-center gap-4 relative z-10">
+  <div class="flex items-center gap-3">
+    <div class="text-3xl md:text-4xl floating-hero">🚀</div>
+    <div>
+      <h1 class="text-xl md:text-2xl font-black tracking-wider text-yellow-300 drop-shadow">數學星際冒險</h1>
+      <p class="text-xs text-indigo-200">國小一年級學習扶助・全班合作闖關</p>
+    </div>
+  </div>
+
+  <!-- 分數與進度資訊 -->
+  <div class="flex items-center gap-3 md:gap-6">
+    <div class="bg-indigo-900/90 border border-yellow-400/50 px-4 py-2 rounded-2xl flex items-center gap-2">
+      <span class="text-2xl">🌟</span>
+      <div>
+        <div class="text-xs text-yellow-200 font-bold">全班能量總星數</div>
+        <div id="classScore" class="text-2xl font-black text-yellow-300">0</div>
+      </div>
+    </div>
+    <div class="bg-slate-700/80 px-3 py-2 rounded-2xl border border-slate-500 text-center">
+      <div class="text-xs text-slate-300">星際關卡</div>
+      <div id="questProgress" class="text-lg font-bold text-cyan-300">1 / 14</div>
+    </div>
+    
+    <!-- 聲音切換按鈕 -->
+    <div class="flex gap-2">
+      <button id="bgmBtn" onclick="toggleBgm()" class="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-lg btn-3d" title="背景音樂開關">🎵</button>
+      <button id="sfxBtn" onclick="toggleSfx()" class="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-lg btn-3d" title="音效開關">🔊</button>
+    </div>
+  </div>
+</header>
+
+<!-- 主答題闖關舞台 -->
+<main id="gameStage" class="w-full max-w-4xl bg-slate-900/90 backdrop-blur-lg border-4 border-indigo-500/50 rounded-3xl p-5 md:p-8 shadow-2xl relative z-10 flex flex-col justify-between min-h-[580px]">
+  
+  <!-- 題目類別徽章與失誤提示 -->
+  <div class="flex justify-between items-center mb-3">
+    <span id="topicBadge" class="bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold text-xs md:text-sm px-3 py-1.5 rounded-full shadow">
+      數數與計數
+    </span>
+    <span id="mistakeBadge" class="hidden bg-rose-500/20 text-rose-300 border border-rose-400 text-xs px-3 py-1 rounded-full font-bold">
+      ⚠️ 本題曾有失誤，訂正答對將不累積題目星數
+    </span>
+  </div>
+
+  <!-- 題目描述區 (特大字體適合一年級) -->
+  <div class="text-center my-2">
+    <h2 id="questionText" class="text-2xl md:text-3xl font-extrabold text-white leading-snug drop-shadow-md">
+      題目載入中...
+    </h2>
+  </div>
+
+  <!-- 具體圖解渲染畫布區 (吸管、積木、定位板、對應連線) -->
+  <div id="illustrationArea" class="my-3 bg-slate-950/60 border-2 border-indigo-900 rounded-2xl p-3 min-h-[170px] flex items-center justify-center overflow-hidden">
+    <!-- SVG / 圖像動態生成於此 -->
+  </div>
+
+  <!-- 四個選項點擊區 (大按鈕，觸控友善) -->
+  <div id="optionsGrid" class="grid grid-cols-2 gap-3 md:gap-4 mt-2">
+    <!-- 動態生成 4 個按鈕 -->
+  </div>
+
+</main>
+
+<!-- 老師引導說明卡 (彈窗：點選任何選項後詳細解說為什麼) -->
+<div id="explanationModal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-gradient-to-b from-slate-800 to-slate-900 border-4 border-yellow-400 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl text-center relative">
+    
+    <div id="modalStatusIcon" class="text-5xl md:text-6xl mb-2">🎉</div>
+    <h3 id="modalTitle" class="text-2xl md:text-3xl font-black text-yellow-300 mb-2">太棒了！答對囉！</h3>
+    
+    <!-- 老師講解原因區 -->
+    <div class="bg-indigo-950/70 border-2 border-indigo-400/40 rounded-2xl p-4 text-left my-4 shadow-inner">
+      <div class="flex items-center gap-2 mb-2 text-yellow-300 font-bold text-base md:text-lg">
+        <span>👨‍🏫 老師的觀念引導：為什麼是這個答案？</span>
+      </div>
+      <div id="explanationDetail" class="text-slate-100 text-base md:text-lg leading-relaxed whitespace-pre-line font-medium">
+        說明內容載入中...
+      </div>
+      <!-- 額外圖示解說 -->
+      <div id="explanationGraphic" class="mt-3 flex justify-center items-center"></div>
+    </div>
+
+    <!-- 按鈕動作區 -->
+    <div id="modalActions" class="mt-5 flex justify-center gap-4">
+      <!-- 根據答對或答錯動態切換按鈕 -->
+    </div>
+  </div>
+</div>
+
+<!-- 太空扭蛋機 / 神秘能量盲盒 抽獎舞台 -->
+<div id="gachaModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-slate-900 border-4 border-cyan-400 rounded-3xl p-6 md:p-8 max-w-xl w-full text-center relative shadow-2xl flex flex-col items-center">
+    
+    <div class="inline-block bg-cyan-500/20 border border-cyan-400 px-4 py-1.5 rounded-full text-cyan-300 font-bold text-sm mb-3">
+      🛸 答對獎勵！星際太空能量扭蛋機
+    </div>
+    
+    <h3 class="text-2xl md:text-3xl font-black text-white mb-2">轉動神秘太空膠囊！</h3>
+    <p class="text-slate-300 text-sm md:text-base mb-4">請上台的小朋友親自轉動手把，抽出額外加分星際寶物！</p>
+
+    <!-- 扭蛋機主體 SVG 動畫區 -->
+    <div id="gachaMachineWrapper" class="relative w-64 h-64 flex items-center justify-center my-2">
+      <svg id="gachaMachineSvg" viewBox="0 0 200 200" class="w-full h-full drop-shadow-2xl">
+        <!-- 扭蛋機頂部透明球罩 -->
+        <circle cx="100" cy="85" r="55" fill="rgba(165, 243, 252, 0.2)" stroke="#22d3ee" stroke-width="4"/>
+        <ellipse cx="80" cy="55" rx="20" ry="10" fill="rgba(255, 255, 255, 0.3)" transform="rotate(-20 80 55)"/>
+        
+        <!-- 裡面的多色扭蛋小球 -->
+        <circle cx="85" cy="95" r="14" fill="#f43f5e" stroke="#fff" stroke-width="2"/>
+        <circle cx="115" cy="95" r="14" fill="#fbbf24" stroke="#fff" stroke-width="2"/>
+        <circle cx="100" cy="70" r="14" fill="#3b82f6" stroke="#fff" stroke-width="2"/>
+        <circle cx="80" cy="75" r="13" fill="#10b981" stroke="#fff" stroke-width="2"/>
+        <circle cx="120" cy="80" r="13" fill="#a855f7" stroke="#fff" stroke-width="2"/>
+
+        <!-- 扭蛋機底座 -->
+        <path d="M50 120 L150 120 L140 185 L60 185 Z" fill="#6366f1" stroke="#4338ca" stroke-width="4"/>
+        <!-- 出蛋口 -->
+        <rect x="80" y="145" width="40" height="30" rx="8" fill="#1e1b4b" stroke="#312e81" stroke-width="2"/>
+        
+        <!-- 可點擊旋轉手把 -->
+        <g id="gachaKnob" class="cursor-pointer" onclick="spinGachaHandle()">
+          <circle cx="100" cy="132" r="10" fill="#fbbf24" stroke="#d97706" stroke-width="2"/>
+          <rect x="88" y="129" width="24" height="6" rx="3" fill="#ffffff"/>
+        </g>
+      </svg>
+
+      <!-- 滾出來的發光扭蛋球 (預設隱藏) -->
+      <div id="droppedBall" class="absolute hidden bottom-2 flex flex-col items-center cursor-pointer" onclick="openGachaBall()">
+        <div id="ballColor" class="w-20 h-20 rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-3xl font-black bg-gradient-to-tr from-pink-500 to-yellow-400">
+          🎁
+        </div>
+        <span class="text-xs bg-yellow-400 text-slate-900 font-extrabold px-3 py-1 rounded-full mt-2 animate-bounce">
+          點我打開！
+        </span>
+      </div>
+    </div>
+
+    <!-- 扭蛋結果揭曉卡 (打開後顯示) -->
+    <div id="gachaRewardBox" class="hidden w-full bg-indigo-950/80 border-2 border-emerald-400 rounded-2xl p-4 my-2 text-center">
+      <div id="rewardIcon" class="text-5xl mb-1">🌟</div>
+      <div id="rewardTitle" class="text-2xl font-black text-yellow-300">+20 超能星光！</div>
+      <div id="rewardDesc" class="text-slate-200 text-sm mt-1">全班同心協力，星際能量大爆發！</div>
+    </div>
+
+    <!-- 控制扭蛋按鈕 -->
+    <div class="mt-4 flex gap-3">
+      <button id="spinBtn" onclick="spinGachaHandle()" class="px-8 py-3.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-900 font-black text-xl rounded-2xl btn-3d flex items-center gap-2">
+        <span>🔄 轉動扭蛋手把</span>
+      </button>
+      <button id="nextAfterGachaBtn" onclick="finishGachaAndContinue()" class="hidden px-8 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xl rounded-2xl btn-3d">
+        前往下一關 🚀
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- 通關大慶祝結算畫面 -->
+<div id="victoryModal" class="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-gradient-to-b from-indigo-900 to-slate-950 border-4 border-yellow-400 rounded-3xl p-8 max-w-xl w-full text-center shadow-2xl">
+    <div class="text-7xl mb-3 animate-bounce">🏆</div>
+    <h2 class="text-3xl md:text-4xl font-black text-yellow-300 mb-2">星際探險大成功！</h2>
+    <p class="text-indigo-200 text-lg mb-6">全班同學合力完成了全部 14 關考驗！</p>
+    
+    <div class="bg-slate-800/80 border-2 border-yellow-400/50 rounded-2xl p-6 my-4">
+      <div class="text-slate-300 text-base mb-1 font-bold">全班合力累積星際總能量</div>
+      <div id="finalScore" class="text-5xl font-black text-yellow-300 tracking-wider">0 🌟</div>
+      <div class="text-emerald-400 font-bold text-sm mt-2">✨ 榮獲：宇宙數學特級小艦長勳章！</div>
+    </div>
+
+    <button onclick="restartGame()" class="mt-4 px-8 py-4 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 text-slate-950 font-black text-xl rounded-2xl btn-3d">
+      🔄 重新洗牌再玩一次！
+    </button>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. 純 Web Audio API 歡樂音效與輕快 BGM
+// ==========================================
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+let bgmInterval = null;
+let bgmEnabled = true;
+let sfxEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+  }
+}
+
+function playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.15) {
+  if (!sfxEnabled) return;
+  try {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+
+// 答對三連音
+function playCorrectSfx() {
+  playTone(523.25, 'triangle', 0.12, 0.2);
+  setTimeout(() => playTone(659.25, 'triangle', 0.12, 0.2), 100);
+  setTimeout(() => playTone(783.99, 'triangle', 0.15, 0.2), 200);
+  setTimeout(() => playTone(1046.50, 'triangle', 0.3, 0.25), 300);
+}
+
+// 答錯溫和提示音
+function playWrongSfx() {
+  playTone(330, 'sine', 0.18, 0.2);
+  setTimeout(() => playTone(247, 'sine', 0.25, 0.2), 160);
+}
+
+// 扭蛋喀喀轉動聲
+function playGachaCrankSfx() {
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      playTone(400 + Math.random() * 200, 'square', 0.05, 0.1);
+    }, i * 80);
+  }
+}
+
+// 扭蛋打開碰開驚喜音
+function playGachaOpenSfx() {
+  playTone(587.33, 'triangle', 0.1, 0.2);
+  setTimeout(() => playTone(880, 'triangle', 0.1, 0.2), 80);
+  setTimeout(() => playTone(1174.66, 'sine', 0.35, 0.3), 160);
+}
+
+// 輕快五聲音階背景音樂生成
+const bgmNotes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+let bgmStep = 0;
+function startBgm() {
+  if (bgmInterval) clearInterval(bgmInterval);
+  bgmInterval = setInterval(() => {
+    if (!bgmEnabled) return;
+    try {
+      initAudio();
+      // 主旋律
+      const note = bgmNotes[bgmStep % bgmNotes.length];
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.28);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+
+      // 低音跳躍伴奏
+      if (bgmStep % 2 === 0) {
+        const bassOsc = audioCtx.createOscillator();
+        const bassGain = audioCtx.createGain();
+        bassOsc.type = 'triangle';
+        bassOsc.frequency.setValueAtTime(130.81, audioCtx.currentTime);
+        bassGain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+        bassOsc.connect(bassGain);
+        bassGain.connect(audioCtx.destination);
+        bassOsc.start();
+        bassOsc.stop(audioCtx.currentTime + 0.38);
+      }
+      bgmStep++;
+    } catch(e) {}
+  }, 360);
+}
+
+function toggleBgm() {
+  bgmEnabled = !bgmEnabled;
+  document.getElementById('bgmBtn').innerText = bgmEnabled ? '🎵' : '🔇';
+  if (bgmEnabled && !bgmInterval) startBgm();
+}
+
+function toggleSfx() {
+  sfxEnabled = !sfxEnabled;
+  document.getElementById('sfxBtn').innerText = sfxEnabled ? '🔊' : '🔈';
+}
+
+// ==========================================
+// 2. 整合三個單元之核心題庫 (共 14 道題)
+// ==========================================
+const questionBank = [
+  // --- NC-1-1-1 ---
+  {
+    topic: "NC-1-1-1 數數與進位",
+    q: "盤子裡已經有 29 個橘子，再放進 1 個橘子，總共有幾個橘子？",
+    type: "orange_add",
+    options: ["20 個", "28 個", "30 個", "31 個"],
+    answerIndex: 2,
+    score: 10,
+    hint: "9 個再多 1 個是 10 個，所以 29 個再多 1 個就是 30 個！",
+    renderSvg: () => `
+      <svg viewBox="0 0 400 130" class="w-full max-w-md h-auto">
+        <rect x="20" y="25" width="165" height="85" rx="12" fill="#fff" stroke="#f97316" stroke-width="3"/>
+        <text x="102" y="75" font-size="28" font-weight="bold" fill="#ea580c" text-anchor="middle">29 個橘子 🍊</text>
+        <text x="205" y="75" font-size="32" font-weight="bold" fill="#fbbf24" text-anchor="middle">＋</text>
+        <circle cx="260" cy="68" r="28" fill="#fdba74" stroke="#ea580c" stroke-width="3"/>
+        <text x="260" y="75" font-size="24" text-anchor="middle">🍊</text>
+        <text x="260" y="115" font-size="14" fill="#cbd5e1" text-anchor="middle">再給 1 個</text>
+        <text x="325" y="75" font-size="32" font-weight="bold" fill="#38bdf8" text-anchor="middle">＝ ？</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-1 數數與進位",
+    q: "存錢筒裡有 99 顆星星，再得到 1 顆星星，總共是多少顆星星？",
+    type: "stars_99",
+    options: ["90 顆", "100 顆", "91 顆", "89 顆"],
+    answerIndex: 1,
+    score: 10,
+    hint: "19再來是20、29再來是30……89再來是90，所以 99 再多 1 個就是 100 喔！",
+    renderSvg: () => `
+      <svg viewBox="0 0 400 120" class="w-full max-w-md h-auto">
+        <rect x="40" y="20" width="150" height="80" rx="16" fill="#312e81" stroke="#818cf8" stroke-width="3"/>
+        <text x="115" y="68" font-size="28" font-weight="bold" fill="#fbbf24" text-anchor="middle">99 顆 ⭐</text>
+        <text x="215" y="68" font-size="30" font-weight="bold" fill="#38bdf8" text-anchor="middle">＋ ⭐ ＝</text>
+        <rect x="270" y="25" width="90" height="70" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-dasharray="6,4" stroke-width="3"/>
+        <text x="315" y="68" font-size="30" font-weight="bold" fill="#38bdf8" text-anchor="middle">？</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-1 又來幾個接著數",
+    q: "花園裡原來有 7 隻小雞，又跑來 4 隻，現在一共有幾隻小雞？",
+    type: "chick_count",
+    options: ["10 隻", "11 隻", "12 隻", "13 隻"],
+    answerIndex: 1,
+    score: 10,
+    hint: "記住原本的 7 隻，接著往後數 4 隻：8、9、10、11！所以一共有 11 隻小雞！",
+    renderSvg: () => `
+      <svg viewBox="0 0 420 120" class="w-full max-w-md h-auto">
+        <rect x="15" y="25" width="130" height="75" rx="12" fill="#fef08a" stroke="#ca8a04" stroke-width="2"/>
+        <text x="80" y="60" font-size="20" font-weight="bold" fill="#854d0e" text-anchor="middle">原有的 7 隻 🐥</text>
+        <text x="80" y="85" font-size="13" fill="#a16207" text-anchor="middle">(記在心裡)</text>
+        <text x="165" y="68" font-size="24" font-weight="bold" fill="#fbbf24">→</text>
+        <!-- 4隻小雞 -->
+        <g transform="translate(190, 30)">
+          <circle cx="20" cy="30" r="18" fill="#fef9c3" stroke="#eab308" stroke-width="2"/>
+          <text x="20" y="36" font-size="14" text-anchor="middle">8</text>
+          <circle cx="65" cy="30" r="18" fill="#fef9c3" stroke="#eab308" stroke-width="2"/>
+          <text x="65" y="36" font-size="14" text-anchor="middle">9</text>
+          <circle cx="110" cy="30" r="18" fill="#fef9c3" stroke="#eab308" stroke-width="2"/>
+          <text x="110" y="36" font-size="14" text-anchor="middle">10</text>
+          <circle cx="155" cy="30" r="18" fill="#fef9c3" stroke="#eab308" stroke-width="2"/>
+          <text x="155" y="36" font-size="14" text-anchor="middle">11</text>
+          <text x="88" y="70" font-size="13" fill="#38bdf8" text-anchor="middle">伸出4根手指接著數：8, 9, 10, 11</text>
+        </g>
+      </svg>
+    `
+  },
+
+  // --- NC-1-1-2 ---
+  {
+    topic: "NC-1-1-2 吸管十進位化聚",
+    q: "10 根吸管綁成 1 捆。36 根吸管可以綁成幾捆又剩下幾根？",
+    type: "straws_bundle",
+    options: ["2 捆又 6 根", "3 捆又 6 根", "6 捆又 3 根", "30 捆又 6 根"],
+    answerIndex: 1,
+    score: 10,
+    hint: "每 10 根綁成 1 捆：10、20、30（有 3 捆），剩下的 6 根不到 10 根不能綁，所以是 3 捆又 6 根！",
+    renderSvg: () => `
+      <svg viewBox="0 0 420 125" class="w-full max-w-md h-auto">
+        <!-- 3 捆吸管 -->
+        <g transform="translate(30, 20)">
+          <rect x="0" y="10" width="30" height="60" rx="5" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>
+          <text x="15" y="45" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">10</text>
+          <rect x="40" y="10" width="30" height="60" rx="5" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>
+          <text x="55" y="45" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">10</text>
+          <rect x="80" y="10" width="30" height="60" rx="5" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>
+          <text x="95" y="45" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">10</text>
+          <text x="55" y="90" font-size="15" font-weight="bold" fill="#38bdf8" text-anchor="middle">3 捆 (30根)</text>
+        </g>
+        <text x="175" y="65" font-size="24" fill="#fbbf24">＋</text>
+        <!-- 6 根散的 -->
+        <g transform="translate(210, 20)">
+          <line x1="10" y1="15" x2="10" y2="65" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <line x1="25" y1="15" x2="25" y2="65" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <line x1="40" y1="15" x2="40" y2="65" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <line x1="55" y1="15" x2="55" y2="65" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <line x1="70" y1="15" x2="70" y2="65" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <line x1="85" y1="15" x2="85" y2="65" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <text x="50" y="90" font-size="15" font-weight="bold" fill="#e2e8f0" text-anchor="middle">又 6 根</text>
+        </g>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-2 積木單位換算",
+    q: "10 個白色積木和 1 條橘色積木一樣長。3 條橘色積木又 8 個白色積木，合起來是幾個白色積木？",
+    type: "block_convert",
+    options: ["30 個", "38 個", "83 個", "18 個"],
+    answerIndex: 1,
+    score: 10,
+    hint: "1 條橘色積木代表 10，3 條就是 10、20、30！再接著數 8 個白色積木，30 再加 8 是 38 個！",
+    renderSvg: () => `
+      <svg viewBox="0 0 400 120" class="w-full max-w-md h-auto">
+        <g transform="translate(30, 25)">
+          <rect x="0" y="0" width="140" height="18" fill="#f97316" stroke="#c2410c" stroke-width="2" rx="3"/>
+          <rect x="0" y="24" width="140" height="18" fill="#f97316" stroke="#c2410c" stroke-width="2" rx="3"/>
+          <rect x="0" y="48" width="140" height="18" fill="#f97316" stroke="#c2410c" stroke-width="2" rx="3"/>
+          <text x="70" y="85" font-size="14" fill="#fdba74" font-weight="bold" text-anchor="middle">3 條橘色 (30)</text>
+        </g>
+        <text x="195" y="60" font-size="22" fill="#fbbf24">＋</text>
+        <g transform="translate(225, 30)">
+          <g fill="#f8fafc" stroke="#64748b" stroke-width="1.5">
+            <rect x="0" y="0" width="14" height="14" rx="2"/>
+            <rect x="18" y="0" width="14" height="14" rx="2"/>
+            <rect x="36" y="0" width="14" height="14" rx="2"/>
+            <rect x="54" y="0" width="14" height="14" rx="2"/>
+            <rect x="72" y="0" width="14" height="14" rx="2"/>
+            <rect x="90" y="0" width="14" height="14" rx="2"/>
+            <rect x="108" y="0" width="14" height="14" rx="2"/>
+            <rect x="126" y="0" width="14" height="14" rx="2"/>
+          </g>
+          <text x="70" y="45" font-size="14" fill="#f8fafc" font-weight="bold" text-anchor="middle">8 個白色 (8)</text>
+        </g>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-2 錢幣換算",
+    q: "小明有 4 個 ⑩ 元和 6 個 ① 元，合起來一共是多少元？",
+    type: "coin_sum",
+    options: ["40 元", "46 元", "64 元", "10 元"],
+    answerIndex: 1,
+    score: 10,
+    hint: "4 個 10 元是 10、20、30、40 元；再加上 6 個 1 元，40 加上 6 就是 46 元！",
+    renderSvg: () => `
+      <svg viewBox="0 0 380 120" class="w-full max-w-md h-auto">
+        <!-- 4個10元 -->
+        <g transform="translate(20, 20)">
+          <circle cx="20" cy="30" r="20" fill="#fef08a" stroke="#ca8a04" stroke-width="3"/>
+          <text x="20" y="37" font-size="16" font-weight="bold" fill="#854d0e" text-anchor="middle">10</text>
+          <circle cx="65" cy="30" r="20" fill="#fef08a" stroke="#ca8a04" stroke-width="3"/>
+          <text x="65" y="37" font-size="16" font-weight="bold" fill="#854d0e" text-anchor="middle">10</text>
+          <circle cx="110" cy="30" r="20" fill="#fef08a" stroke="#ca8a04" stroke-width="3"/>
+          <text x="110" y="37" font-size="16" font-weight="bold" fill="#854d0e" text-anchor="middle">10</text>
+          <circle cx="155" cy="30" r="20" fill="#fef08a" stroke="#ca8a04" stroke-width="3"/>
+          <text x="155" y="37" font-size="16" font-weight="bold" fill="#854d0e" text-anchor="middle">10</text>
+          <text x="90" y="75" font-size="14" fill="#fde047" font-weight="bold" text-anchor="middle">4 個 10 元 (40元)</text>
+        </g>
+        <!-- 6個1元 -->
+        <g transform="translate(210, 25)">
+          <g fill="#e2e8f0" stroke="#64748b" stroke-width="2">
+            <circle cx="15" cy="15" r="13"/><text x="15" y="20" font-size="12" fill="#334155" font-weight="bold" text-anchor="middle">1</text>
+            <circle cx="45" cy="15" r="13"/><text x="45" y="20" font-size="12" fill="#334155" font-weight="bold" text-anchor="middle">1</text>
+            <circle cx="75" cy="15" r="13"/><text x="75" y="20" font-size="12" fill="#334155" font-weight="bold" text-anchor="middle">1</text>
+            <circle cx="105" cy="15" r="13"/><text x="105" y="20" font-size="12" fill="#334155" font-weight="bold" text-anchor="middle">1</text>
+            <circle cx="135" cy="15" r="13"/><text x="135" y="20" font-size="12" fill="#334155" font-weight="bold" text-anchor="middle">1</text>
+          </g>
+          <text x="75" y="65" font-size="14" fill="#e2e8f0" font-weight="bold" text-anchor="middle">又 6 個 1 元</text>
+        </g>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-2 定位板與位名",
+    q: "看右邊的定位板，數字「58」的十位數字是幾？個位數字是幾？",
+    type: "place_value_board",
+    options: [
+      "十位是 5，個位是 8",
+      "十位是 8，個位是 5",
+      "十位是 50，個位是 8",
+      "十位是 5，個位是 80"
+    ],
+    answerIndex: 0,
+    score: 10,
+    hint: "定位板左邊是記錄有幾個10的「十位」，右邊是記錄有幾個1的「個位」！58的十位數字是5，個位數字是8！",
+    renderSvg: () => `
+      <svg viewBox="0 0 300 130" class="w-full max-w-xs h-auto">
+        <rect x="50" y="15" width="200" height="95" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="3"/>
+        <line x1="150" y1="15" x2="150" y2="110" stroke="#818cf8" stroke-width="2"/>
+        <line x1="50" y1="55" x2="250" y2="55" stroke="#818cf8" stroke-width="2"/>
+        <text x="100" y="42" font-size="18" font-weight="bold" fill="#38bdf8" text-anchor="middle">十位 (⑩)</text>
+        <text x="200" y="42" font-size="18" font-weight="bold" fill="#fbbf24" text-anchor="middle">個位 (①)</text>
+        <text x="100" y="93" font-size="34" font-weight="900" fill="#ffffff" text-anchor="middle">5</text>
+        <text x="200" y="93" font-size="34" font-weight="900" fill="#ffffff" text-anchor="middle">8</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-2 數的組成",
+    q: "數字「84」是由幾個十和幾個一合起來的？",
+    type: "composition_84",
+    options: [
+      "8 個一和 4 個十",
+      "8 個十和 4 個一",
+      "80 個十和 4 個一",
+      "4 個十和 8 個一"
+    ],
+    answerIndex: 1,
+    score: 10,
+    hint: "84 的十位是 8，表示有 8 個十；個位是 4，表示有 4 個一！所以是 8 個十和 4 個一合起來的！",
+    renderSvg: () => `
+      <svg viewBox="0 0 360 110" class="w-full max-w-sm h-auto">
+        <rect x="30" y="20" width="130" height="70" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="3"/>
+        <text x="95" y="55" font-size="16" fill="#94a3b8" text-anchor="middle">十位數字 8</text>
+        <text x="95" y="78" font-size="18" font-weight="bold" fill="#38bdf8" text-anchor="middle">8 個十</text>
+        
+        <text x="180" y="60" font-size="24" fill="#fbbf24" text-anchor="middle">和</text>
+
+        <rect x="200" y="20" width="130" height="70" rx="12" fill="#1e293b" stroke="#f472b6" stroke-width="3"/>
+        <text x="265" y="55" font-size="16" fill="#94a3b8" text-anchor="middle">個位數字 4</text>
+        <text x="265" y="78" font-size="18" font-weight="bold" fill="#f472b6" text-anchor="middle">4 個一</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-2 雞蛋裝盒應用",
+    q: "1 盒雞蛋有 10 顆。媽媽買了 25 顆雞蛋，可以裝成幾盒又剩下幾顆？",
+    type: "egg_box",
+    options: ["1 盒又 5 顆", "2 盒又 5 顆", "5 盒又 2 顆", "20 盒又 5 顆"],
+    answerIndex: 1,
+    score: 10,
+    hint: "10 顆裝滿 1 盒：10 顆（第1盒）、20 顆（第2盒），剩下 5 顆不夠裝滿 1 盒，所以是 2 盒又 5 顆！",
+    renderSvg: () => `
+      <svg viewBox="0 0 380 120" class="w-full max-w-md h-auto">
+        <!-- 兩盒 -->
+        <rect x="20" y="25" width="85" height="65" rx="8" fill="#475569" stroke="#f59e0b" stroke-width="3"/>
+        <text x="62" y="62" font-size="15" font-weight="bold" fill="#fef08a" text-anchor="middle">10顆裝(1盒)</text>
+        <rect x="120" y="25" width="85" height="65" rx="8" fill="#475569" stroke="#f59e0b" stroke-width="3"/>
+        <text x="162" y="62" font-size="15" font-weight="bold" fill="#fef08a" text-anchor="middle">10顆裝(2盒)</text>
+        <text x="220" y="65" font-size="20" fill="#fbbf24">＋</text>
+        <!-- 散的5顆 -->
+        <g transform="translate(240, 30)">
+          <circle cx="15" cy="30" r="11" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <circle cx="42" cy="30" r="11" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <circle cx="69" cy="30" r="11" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <circle cx="96" cy="30" r="11" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <circle cx="123" cy="30" r="11" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <text x="69" y="62" font-size="13" font-weight="bold" fill="#fef3c7" text-anchor="middle">剩下 5 顆</text>
+        </g>
+      </svg>
+    `
+  },
+
+  // --- NC-1-1-3 ---
+  {
+    topic: "NC-1-1-3 一一對應比多少",
+    q: "看圖中的餅乾和糖果，用「一個對一個連起來」，誰比誰多？",
+    type: "pairing_compare",
+    options: [
+      "餅乾比糖果多",
+      "糖果比餅乾多",
+      "餅乾和糖果一樣多",
+      "無法比較"
+    ],
+    answerIndex: 0,
+    score: 10,
+    hint: "1 片餅乾對 1 顆糖果連起來，糖果連完了，餅乾還有剩下！所以「餅乾比糖果多」！",
+    renderSvg: () => `
+      <svg viewBox="0 0 380 130" class="w-full max-w-md h-auto">
+        <!-- 餅乾 6片 -->
+        <g transform="translate(30, 20)">
+          <text x="0" y="20" font-size="15" font-weight="bold" fill="#fed7aa">餅乾：</text>
+          <rect x="50" y="5" width="22" height="22" rx="4" fill="#ea580c"/>
+          <rect x="90" y="5" width="22" height="22" rx="4" fill="#ea580c"/>
+          <rect x="130" y="5" width="22" height="22" rx="4" fill="#ea580c"/>
+          <rect x="170" y="5" width="22" height="22" rx="4" fill="#ea580c"/>
+          <rect x="210" y="5" width="22" height="22" rx="4" fill="#ea580c"/>
+          <rect x="250" y="5" width="22" height="22" rx="4" fill="#ea580c"/>
+        </g>
+        <!-- 連線虛線 -->
+        <g stroke="#94a3b8" stroke-dasharray="3,3" stroke-width="2">
+          <line x1="91" y1="48" x2="91" y2="75"/>
+          <line x1="131" y1="48" x2="131" y2="75"/>
+          <line x1="171" y1="48" x2="171" y2="75"/>
+          <line x1="211" y1="48" x2="211" y2="75"/>
+        </g>
+        <!-- 糖果 4顆 -->
+        <g transform="translate(30, 75)">
+          <text x="0" y="20" font-size="15" font-weight="bold" fill="#f472b6">糖果：</text>
+          <circle cx="61" cy="15" r="11" fill="#ec4899"/>
+          <circle cx="101" cy="15" r="11" fill="#ec4899"/>
+          <circle cx="141" cy="15" r="11" fill="#ec4899"/>
+          <circle cx="181" cy="15" r="11" fill="#ec4899"/>
+          <text x="240" y="20" font-size="13" fill="#fbbf24" font-weight="bold">←餅乾還有多！</text>
+        </g>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-3 兩數大小比較",
+    q: "比較「72」和「68」，哪一個數比較大？為什麼？",
+    type: "compare_72_68",
+    options: [
+      "72 比較大，因為先比十位，7 比 6 大",
+      "68 比較大，因為個位 8 比 2 大",
+      "一樣大",
+      "68 比較大，因為 68 寫在後面"
+    ],
+    answerIndex: 0,
+    score: 10,
+    hint: "比兩位數的大小時，要【先比較十位】！72 的十位是 7，68 的十位是 6。7 比 6 大，所以 72 比 68 大！",
+    renderSvg: () => `
+      <svg viewBox="0 0 360 120" class="w-full max-w-sm h-auto">
+        <rect x="40" y="20" width="120" height="75" rx="10" fill="#1e1b4b" stroke="#38bdf8" stroke-width="3"/>
+        <text x="100" y="45" font-size="14" fill="#94a3b8" text-anchor="middle">十位  個位</text>
+        <text x="100" y="78" font-size="30" font-weight="900" fill="#38bdf8" text-anchor="middle">
+          <tspan fill="#facc15">7</tspan> 2
+        </text>
+
+        <text x="180" y="65" font-size="26" font-weight="bold" fill="#fff" text-anchor="middle">PK</text>
+
+        <rect x="200" y="20" width="120" height="75" rx="10" fill="#1e1b4b" stroke="#94a3b8" stroke-width="2"/>
+        <text x="260" y="45" font-size="14" fill="#94a3b8" text-anchor="middle">十位  個位</text>
+        <text x="260" y="78" font-size="30" font-weight="900" fill="#e2e8f0" text-anchor="middle">
+          <tspan fill="#94a3b8">6</tspan> 8
+        </text>
+        <text x="180" y="105" font-size="12" fill="#facc15" font-weight="bold" text-anchor="middle">先比十位：7 個十 ＞ 6 個十！</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-3 兩數大小比較",
+    q: "比較「83」和「85」，哪一個數比較小？為什麼？",
+    type: "compare_83_85",
+    options: [
+      "83 比較小，因為十位一樣大，再比個位 3 比 5 小",
+      "85 比較小，因為個位 5 比 3 大",
+      "83 比較大，因為 3 比 5 厲害",
+      "一樣大，因為十位都是 8"
+    ],
+    answerIndex: 0,
+    score: 10,
+    hint: "十位數字都是 8 一樣大時，就要【再比較個位】！個位 3 比 5 小，所以 83 比 85 小！",
+    renderSvg: () => `
+      <svg viewBox="0 0 360 120" class="w-full max-w-sm h-auto">
+        <rect x="40" y="20" width="120" height="75" rx="10" fill="#1e1b4b" stroke="#38bdf8" stroke-width="3"/>
+        <text x="100" y="45" font-size="14" fill="#94a3b8" text-anchor="middle">十位  個位</text>
+        <text x="100" y="78" font-size="30" font-weight="900" fill="#38bdf8" text-anchor="middle">
+          8 <tspan fill="#f43f5e">3</tspan>
+        </text>
+
+        <text x="180" y="65" font-size="26" font-weight="bold" fill="#fff" text-anchor="middle">PK</text>
+
+        <rect x="200" y="20" width="120" height="75" rx="10" fill="#1e1b4b" stroke="#38bdf8" stroke-width="3"/>
+        <text x="260" y="45" font-size="14" fill="#94a3b8" text-anchor="middle">十位  個位</text>
+        <text x="260" y="78" font-size="30" font-weight="900" fill="#38bdf8" text-anchor="middle">
+          8 <tspan fill="#22c55e">5</tspan>
+        </text>
+        <text x="180" y="105" font-size="12" fill="#38bdf8" font-weight="bold" text-anchor="middle">十位相同都是8，比個位：3 比 5 小！</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-3 數的順序與大小",
+    q: "數數看：7、8、9、10、11、12。先唸到的數和後唸到的數，誰比較大？",
+    type: "number_sequence_order",
+    options: [
+      "後唸到的數比較大（12比7大）",
+      "先唸到的數比較大（7比12大）",
+      "都一樣大",
+      "看哪一個數字字體比較大"
+    ],
+    answerIndex: 0,
+    score: 10,
+    hint: "在數數排隊時，先唸到的數代表數量較少（比較小），後唸到的數代表越聚越多（比較大）！12比7後唸到，所以12大於7！",
+    renderSvg: () => `
+      <svg viewBox="0 0 380 110" class="w-full max-w-md h-auto">
+        <line x1="30" y1="50" x2="350" y2="50" stroke="#6366f1" stroke-width="4" stroke-linecap="round"/>
+        <polygon points="355,50 340,43 340,57" fill="#6366f1"/>
+        <circle cx="50" cy="50" r="14" fill="#3b82f6"/><text x="50" y="55" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">7</text>
+        <text x="50" y="85" font-size="12" fill="#93c5fd" text-anchor="middle">先唸(較小)</text>
+        <circle cx="100" cy="50" r="10" fill="#60a5fa"/><text x="100" y="54" font-size="11" fill="#fff" text-anchor="middle">8</text>
+        <circle cx="150" cy="50" r="10" fill="#60a5fa"/><text x="150" y="54" font-size="11" fill="#fff" text-anchor="middle">9</text>
+        <circle cx="200" cy="50" r="10" fill="#60a5fa"/><text x="200" y="54" font-size="11" fill="#fff" text-anchor="middle">10</text>
+        <circle cx="250" cy="50" r="10" fill="#60a5fa"/><text x="250" y="54" font-size="11" fill="#fff" text-anchor="middle">11</text>
+        <circle cx="310" cy="50" r="16" fill="#f59e0b"/><text x="310" y="56" font-size="14" font-weight="bold" fill="#fff" text-anchor="middle">12</text>
+        <text x="310" y="85" font-size="12" fill="#fde047" text-anchor="middle">後唸(較大)</text>
+      </svg>
+    `
+  },
+  {
+    topic: "NC-1-1-1 點數與十的累加",
+    q: "請按照順序讀出數字：30 → 31 → 32 → (  ) → 34 → 35。括號裡應該填入多少？",
+    type: "fill_sequence",
+    options: ["23", "33", "43", "36"],
+    answerIndex: 1,
+    score: 10,
+    hint: "30多1個是31、31多1個是32，那麼32再多1個就是 33 囉！",
+    renderSvg: () => `
+      <svg viewBox="0 0 380 100" class="w-full max-w-md h-auto">
+        <text x="35" y="58" font-size="20" font-weight="bold" fill="#94a3b8">30→</text>
+        <text x="90" y="58" font-size="20" font-weight="bold" fill="#94a3b8">31→</text>
+        <text x="145" y="58" font-size="20" font-weight="bold" fill="#94a3b8">32→</text>
+        <rect x="195" y="25" width="55" height="45" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="3"/>
+        <text x="222" y="56" font-size="24" font-weight="bold" fill="#38bdf8" text-anchor="middle">？</text>
+        <text x="265" y="58" font-size="20" font-weight="bold" fill="#94a3b8">→34→35</text>
+      </svg>
+    `
+  }
+];
+
+// ==========================================
+// 3. 遊戲進行邏輯與扭蛋盲盒機制
+// ==========================================
+let currentQuestions = [...questionBank];
+let currentQIndex = 0;
+let totalClassScore = 0;
+let currentQFailed = false; // 是否曾答錯標記
+
+// 太空扭蛋盲盒獎品庫
+const gachaPrizes = [
+  { icon: "🌟", title: "+10 顆能量星星", desc: "太空訊號滿格！全班加 10 分！", addScore: 10, bg: "from-amber-400 to-yellow-500" },
+  { icon: "💎", title: "+20 顆超能水晶", desc: "大豐收！挖到稀有宇宙能量水晶！", addScore: 20, bg: "from-cyan-400 to-blue-500" },
+  { icon: "🚀", title: "+15 火箭推進動能", desc: "點火全速衝刺！全班前進大加分！", addScore: 15, bg: "from-rose-500 to-orange-400" },
+  { icon: "🍀", title: "幸運能量大翻倍 (x1.5)", desc: "幸運小精靈附體！本題星數額外加 15 分！", addScore: 15, bg: "from-emerald-400 to-green-600" },
+  { icon: "🛡️", title: "+10 宇宙守護護盾", desc: "保護全體探險家，全班歡呼加 10 分！", addScore: 10, bg: "from-purple-500 to-indigo-500" }
+];
+let currentDrawnPrize = null;
+let isGachaSpinning = false;
+let isBallOpened = false;
+
+function loadQuestion(index) {
+  currentQFailed = false;
+  document.getElementById('mistakeBadge').classList.add('hidden');
+  
+  const qData = currentQuestions[index];
+  document.getElementById('questProgress').innerText = `${index + 1} / ${currentQuestions.length}`;
+  document.getElementById('topicBadge').innerText = qData.topic;
+  document.getElementById('questionText').innerText = qData.q;
+  
+  // 渲染 SVG 圖形
+  document.getElementById('illustrationArea').innerHTML = qData.renderSvg();
+
+  // 渲染 4 個選項按鈕
+  const optionsGrid = document.getElementById('optionsGrid');
+  optionsGrid.innerHTML = '';
+  qData.options.forEach((optText, optIdx) => {
+    const btn = document.createElement('button');
+    btn.className = `p-4 md:p-5 rounded-2xl bg-indigo-700/80 hover:bg-indigo-600 border-2 border-indigo-400/50 text-white font-black text-lg md:text-xl btn-3d text-left flex items-center gap-3`;
+    btn.innerHTML = `
+      <span class="w-8 h-8 rounded-full bg-white/20 text-yellow-300 flex items-center justify-center font-bold text-sm shrink-0">
+        ${['A','B','C','D'][optIdx]}
+      </span>
+      <span>${optText}</span>
+    `;
+    btn.onclick = () => handleAnswerSelect(optIdx);
+    optionsGrid.appendChild(btn);
+  });
+}
+
+// 點選答案
+function handleAnswerSelect(selectedIdx) {
+  const qData = currentQuestions[currentQIndex];
+  const isCorrect = (selectedIdx === qData.answerIndex);
+
+  const modal = document.getElementById('explanationModal');
+  const icon = document.getElementById('modalStatusIcon');
+  const title = document.getElementById('modalTitle');
+  const detail = document.getElementById('explanationDetail');
+  const actions = document.getElementById('modalActions');
+
+  detail.innerText = qData.hint;
+
+  if (isCorrect) {
+    playCorrectSfx();
+    icon.innerText = "🎉";
+    title.innerText = "太棒了！答對囉！";
+    title.className = "text-2xl md:text-3xl font-black text-yellow-300 mb-2";
+
+    // 加分邏輯：若沒答錯過，加題目的基礎分數
+    let earnedScore = 0;
+    if (!currentQFailed) {
+      earnedScore = qData.score;
+      totalClassScore += earnedScore;
+      updateScoreDisplay();
+    }
+
+    // 答對按鈕
+    actions.innerHTML = `
+      <button onclick="openGachaStage(${!currentQFailed})" class="px-6 py-3.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 text-slate-900 font-black text-xl rounded-2xl btn-3d flex items-center gap-2">
+        <span>🛸 前往太空扭蛋機加分！</span>
+      </button>
+    `;
+
+  } else {
+    // 答錯
+    playWrongSfx();
+    currentQFailed = true;
+    document.getElementById('mistakeBadge').classList.remove('hidden');
+
+    icon.innerText = "💡";
+    title.innerText = "差一點點！來看看老師怎麼說：";
+    title.className = "text-2xl md:text-3xl font-black text-rose-300 mb-2";
+
+    // 答錯引導按鈕：看懂後再試一次
+    actions.innerHTML = `
+      <button onclick="closeExplanationModalAndRetry()" class="px-6 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 text-white font-black text-xl rounded-2xl btn-3d">
+        我弄懂了，換我再選一次！💪
+      </button>
+    `;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeExplanationModalAndRetry() {
+  document.getElementById('explanationModal').classList.add('hidden');
+}
+
+// ==========================================
+// 4. 太空扭蛋機操作邏輯 (完全修復狀態重置)
+// ==========================================
+function resetGachaMachineState() {
+  isGachaSpinning = false;
+  isBallOpened = false;
+  currentDrawnPrize = null;
+
+  const machineSvg = document.getElementById('gachaMachineSvg');
+  if (machineSvg) {
+    machineSvg.classList.remove('gacha-shaking');
+  }
+
+  const droppedBall = document.getElementById('droppedBall');
+  if (droppedBall) {
+    droppedBall.classList.add('hidden');
+    droppedBall.classList.remove('pop-ball-anim');
+  }
+
+  const rewardBox = document.getElementById('gachaRewardBox');
+  if (rewardBox) {
+    rewardBox.classList.add('hidden');
+  }
+
+  const spinBtn = document.getElementById('spinBtn');
+  if (spinBtn) {
+    spinBtn.disabled = false;
+    spinBtn.classList.remove('hidden');
+  }
+
+  const nextBtn = document.getElementById('nextAfterGachaBtn');
+  if (nextBtn) {
+    nextBtn.classList.add('hidden');
+  }
+}
+
+function openGachaStage(canGetBonus) {
+  document.getElementById('explanationModal').classList.add('hidden');
+  
+  // 每次打開扭蛋機前先徹底重置所有按鈕與動畫狀態
+  resetGachaMachineState();
+
+  const gachaModal = document.getElementById('gachaModal');
+  gachaModal.classList.remove('hidden');
+}
+
+// 轉動扭蛋手把
+function spinGachaHandle() {
+  if (isGachaSpinning || isBallOpened) return;
+  isGachaSpinning = true;
+
+  playGachaCrankSfx();
+
+  const machineSvg = document.getElementById('gachaMachineSvg');
+  const spinBtn = document.getElementById('spinBtn');
+  
+  if (spinBtn) spinBtn.disabled = true;
+  if (machineSvg) machineSvg.classList.add('gacha-shaking');
+
+  // 隨機抽取獎勵
+  currentDrawnPrize = gachaPrizes[Math.floor(Math.random() * gachaPrizes.length)];
+
+  setTimeout(() => {
+    if (machineSvg) machineSvg.classList.remove('gacha-shaking');
+    if (spinBtn) spinBtn.classList.add('hidden');
+
+    // 扭蛋球滾出
+    const droppedBall = document.getElementById('droppedBall');
+    const ballColor = document.getElementById('ballColor');
+    if (ballColor && currentDrawnPrize) {
+      ballColor.className = `w-20 h-20 rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-3xl font-black bg-gradient-to-tr ${currentDrawnPrize.bg}`;
+    }
+    
+    if (droppedBall) {
+      droppedBall.classList.remove('hidden');
+      droppedBall.classList.add('pop-ball-anim');
+    }
+    isGachaSpinning = false;
+  }, 900);
+}
+
+// 打開掉出來的扭蛋
+function openGachaBall() {
+  if (!currentDrawnPrize || isBallOpened) return;
+  isBallOpened = true;
+
+  playGachaOpenSfx();
+  
+  const droppedBall = document.getElementById('droppedBall');
+  if (droppedBall) droppedBall.classList.add('hidden');
+
+  const rewardBox = document.getElementById('gachaRewardBox');
+  if (rewardBox) {
+    document.getElementById('rewardIcon').innerText = currentDrawnPrize.icon;
+    document.getElementById('rewardTitle').innerText = currentDrawnPrize.title;
+    document.getElementById('rewardDesc').innerText = currentDrawnPrize.desc;
+    rewardBox.classList.remove('hidden');
+  }
+
+  // 將扭蛋分數計入全班總分
+  totalClassScore += currentDrawnPrize.addScore;
+  updateScoreDisplay();
+
+  // 顯示下一關按鈕
+  const nextBtn = document.getElementById('nextAfterGachaBtn');
+  if (nextBtn) nextBtn.classList.remove('hidden');
+}
+
+// 完成扭蛋並繼續下一題
+function finishGachaAndContinue() {
+  document.getElementById('gachaModal').classList.add('hidden');
+  
+  // 徹底重置扭蛋機狀態以供下一題使用
+  resetGachaMachineState();
+
+  currentQIndex++;
+  if (currentQIndex < currentQuestions.length) {
+    loadQuestion(currentQIndex);
+  } else {
+    showVictoryScreen();
+  }
+}
+
+function updateScoreDisplay() {
+  document.getElementById('classScore').innerText = totalClassScore;
+}
+
+function showVictoryScreen() {
+  playCorrectSfx();
+  document.getElementById('finalScore').innerText = `${totalClassScore} 🌟`;
+  document.getElementById('victoryModal').classList.remove('hidden');
+}
+
+function restartGame() {
+  document.getElementById('victoryModal').classList.add('hidden');
+  resetGachaMachineState();
+  totalClassScore = 0;
+  currentQIndex = 0;
+  updateScoreDisplay();
+  // 重新洗牌
+  currentQuestions.sort(() => Math.random() - 0.5);
+  loadQuestion(0);
+}
+
+// 初始化
+window.onload = () => {
+  // 初始題目隨機洗牌
+  currentQuestions.sort(() => Math.random() - 0.5);
+  loadQuestion(0);
+  startBgm();
+};
+</script>
+</body>
+</html>
