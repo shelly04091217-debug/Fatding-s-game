@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>百數神探：百數表填空大冒險與手寫畫布</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+  * {
+    box-sizing: border-box;
+    font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  /* 禁止畫布區域預設滾動以支援觸控手寫 */
+  .canvas-container {
+    touch-action: none;
+  }
+  .grid-cell {
+    transition: all 0.15s ease-out;
+  }
+  .grid-cell:active {
+    transform: scale(0.94);
+  }
+  /* 3D 卡牌效果 */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .card-inner {
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+  .card-flipped {
+    transform: rotateY(180deg);
+  }
+  .card-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .card-back {
+    transform: rotateY(180deg);
+  }
+  /* 放大鏡移動動畫與光暈 */
+  #roamingGlass {
+    transition: transform 0.9s cubic-bezier(0.34, 1.25, 0.64, 1), opacity 0.3s ease;
+    pointer-events: none;
+  }
+  @keyframes lensPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.8)); }
+    50% { transform: scale(1.08); filter: drop-shadow(0 0 24px rgba(239, 68, 68, 0.9)); }
+  }
+  .lens-focused {
+    animation: lensPulse 1.4s infinite ease-in-out;
+  }
+  /* 自訂滾動軸 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body class="bg-amber-50 min-h-screen flex flex-col items-center p-2 sm:p-4 text-slate-800">
+
+  <!-- 頂部標題與全班合作計分 -->
+  <header class="w-full max-w-7xl bg-white rounded-2xl shadow-md p-3 sm:p-4 mb-3 flex flex-wrap justify-between items-center gap-3 border-2 border-amber-200">
+    <div class="flex items-center gap-3">
+      <div class="bg-amber-500 text-white p-2.5 rounded-2xl shadow-inner text-2xl sm:text-3xl">🔍</div>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-black text-amber-900 tracking-wide flex items-center gap-2">
+          百數神探：放大鏡巡航大冒險
+        </h1>
+        <p class="text-xs sm:text-sm text-amber-700 font-bold">放大鏡巡航定格、觀察「左右 $\pm 1$、上下 $\pm 10$」邊寫邊答！</p>
+      </div>
+    </div>
+
+    <!-- 模式切換與全班積分 -->
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
+      <!-- 放大鏡主動巡邏按鈕 -->
+      <button id="cruiseBtn" onclick="triggerMagnifierCruise()" class="px-3.5 py-1.5 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md border-b-2 border-orange-700 active:scale-95 transition flex items-center gap-1.5">
+        <span class="text-base">🚀</span>
+        <span>放大鏡巡航定格</span>
+      </button>
+
+      <!-- 百數表切換按鈕 -->
+      <div class="bg-amber-100 p-1 rounded-xl flex gap-1 border border-amber-300">
+        <button id="btnTable100" onclick="switchTableMode('1-100')" class="px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition bg-amber-500 text-white shadow-sm">
+          📘 百數表 1~100
+        </button>
+        <button id="btnTable200" onclick="switchTableMode('91-200')" class="px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition text-amber-800 hover:bg-amber-200">
+          📙 跨百表 91~200
+        </button>
+      </div>
+
+      <!-- 全班總分 -->
+      <div class="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-4 py-1.5 rounded-xl font-black text-sm sm:text-base shadow flex items-center gap-2">
+        <span>🌟 全班總星數：</span>
+        <span id="scoreText" class="text-xl sm:text-2xl text-yellow-200 font-extrabold tracking-wider">0</span>
+      </div>
+
+      <!-- 音樂音效開關 -->
+      <div class="flex gap-1.5">
+        <button id="bgmToggleBtn" onclick="toggleBGM()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm border border-slate-300 shadow-sm" title="背景音樂">
+          🎵 音樂: 關
+        </button>
+        <button id="sfxToggleBtn" onclick="toggleSFX()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm border border-slate-300 shadow-sm" title="音效開關">
+          🔊 音效: 開
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主體操作區域：左側手寫與百數表，右側十字窗架與作答板 -->
+  <main class="w-full max-w-7xl flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-start">
+
+    <!-- 左半邊：手寫工具列 + 百數表格子 (佔 8 欄) -->
+    <div class="lg:col-span-8 flex flex-col gap-2 bg-white rounded-3xl p-3 sm:p-4 shadow-lg border-3 border-amber-300 relative">
+      
+      <!-- 白板手寫畫布工具列 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b-2 border-amber-100">
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <span class="text-xs sm:text-sm font-black text-slate-600 flex items-center gap-1">
+            ✏️ 白板手寫筆：
+          </span>
+          <!-- 顏色選擇 -->
+          <button onclick="setPenColor('#EF4444')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-red-500 border-2 border-white shadow ring-2 ring-red-300 transition transform hover:scale-110 active:scale-95" title="紅筆"></button>
+          <button onclick="setPenColor('#2563EB')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-600 border-2 border-white shadow ring-2 ring-transparent transition transform hover:scale-110 active:scale-95" title="藍筆"></button>
+          <button onclick="setPenColor('#1E293B')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 border-2 border-white shadow ring-2 ring-transparent transition transform hover:scale-110 active:scale-95" title="黑筆"></button>
+          <button onclick="setPenColor('#FACC15', 10, 0.45)" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-yellow-400 border-2 border-white shadow ring-2 ring-transparent transition transform hover:scale-110 active:scale-95" title="螢光筆"></button>
+
+          <!-- 橡皮擦 -->
+          <button id="eraserBtn" onclick="setEraser()" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm border border-slate-300 flex items-center gap-1">
+            🧹 橡皮擦
+          </button>
+          <!-- 清除畫布 -->
+          <button onclick="clearCanvas()" class="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs sm:text-sm border border-rose-200">
+            🗑️ 清空筆跡
+          </button>
+        </div>
+
+        <!-- 教師功能：一鍵看解答 -->
+        <div class="flex items-center gap-2">
+          <button id="showAnswersBtn" onclick="toggleAllAnswers()" class="px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs sm:text-sm border border-indigo-200 flex items-center gap-1">
+            👁️ 教師解答: 隱藏
+          </button>
+        </div>
+      </div>
+
+      <!-- 百數表主容器（百數表DOM在下，手寫Canvas在上覆蓋） -->
+      <div id="boardWrapper" class="relative w-full aspect-square max-h-[640px] select-none mx-auto bg-amber-50/50 rounded-2xl overflow-hidden p-1 sm:p-2 border border-amber-200 shadow-inner">
+        <!-- 10x10 百數表格子網格 -->
+        <div id="gridContainer" class="grid grid-cols-10 grid-rows-10 gap-1 sm:gap-1.5 w-full h-full relative"></div>
+
+        <!-- 游移放大鏡元素 (視覺飛行定格在目標格) -->
+        <div id="roamingGlass" class="absolute top-0 left-0 w-16 h-16 sm:w-20 sm:h-20 z-30 opacity-0 pointer-events-none transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+          <div class="relative w-full h-full flex items-center justify-center lens-focused">
+            <!-- 鏡框與玻璃光澤 -->
+            <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 sm:border-[5px] border-amber-500 bg-amber-300/30 backdrop-blur-[1px] shadow-2xl flex items-center justify-center relative">
+              <!-- 十字準心 -->
+              <div class="absolute inset-x-2 h-[2px] bg-red-500/70"></div>
+              <div class="absolute inset-y-2 w-[2px] bg-red-500/70"></div>
+            </div>
+            <!-- 鏡柄 -->
+            <div class="absolute -bottom-2 -right-1 w-3.5 h-6 sm:w-4 sm:h-7 bg-amber-800 rounded-sm transform rotate-45 shadow-md border border-amber-950"></div>
+          </div>
+        </div>
+
+        <!-- 自由塗鴉 Canvas 層 -->
+        <canvas id="paintCanvas" class="absolute inset-0 w-full h-full pointer-events-auto z-20 cursor-crosshair"></canvas>
+      </div>
+
+      <!-- 底部提示小提醒 -->
+      <div class="flex justify-between items-center text-xs sm:text-sm text-slate-500 font-bold px-1">
+        <span class="flex items-center gap-1">💡 點按「🚀 放大鏡巡航定格」讓放大鏡游移出題！</span>
+        <span class="text-amber-800">🖊️ 手指可在上方任意圈數、標記箭頭</span>
+      </div>
+    </div>
+
+    <!-- 右半邊：十字探索窗架 ➕ 虛擬填數作答區 (佔 4 欄) -->
+    <div class="lg:col-span-4 flex flex-col gap-3">
+
+      <!-- 十字窗架探索卡片 -->
+      <div class="bg-white rounded-3xl p-4 shadow-lg border-3 border-amber-300 flex flex-col items-center">
+        <div class="flex items-center justify-between w-full mb-3">
+          <h2 class="text-base sm:text-lg font-black text-amber-900 flex items-center gap-1.5">
+            <span>➕ 十字窗架探索鏡</span>
+          </h2>
+          <span id="targetCoordLabel" class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">請點選百數表格子</span>
+        </div>
+
+        <!-- 十字架視覺模型 (上下左右) -->
+        <div class="relative w-56 h-56 bg-amber-50 rounded-2xl p-2 border-2 border-dashed border-amber-300 flex items-center justify-center">
+          
+          <!-- 上方鄰居 (-10) -->
+          <div class="absolute top-2 w-14 h-14 bg-white rounded-xl shadow-md border-2 border-slate-300 flex flex-col items-center justify-center transition">
+            <span class="text-[10px] text-slate-400 font-black">⬆️ -10</span>
+            <span id="neighborUp" class="text-base sm:text-lg font-black text-slate-700">--</span>
+          </div>
+
+          <!-- 下方鄰居 (+10) -->
+          <div class="absolute bottom-2 w-14 h-14 bg-white rounded-xl shadow-md border-2 border-slate-300 flex flex-col items-center justify-center transition">
+            <span class="text-[10px] text-slate-400 font-black">⬇️ +10</span>
+            <span id="neighborDown" class="text-base sm:text-lg font-black text-slate-700">--</span>
+          </div>
+
+          <!-- 左方鄰居 (-1) -->
+          <div class="absolute left-2 w-14 h-14 bg-white rounded-xl shadow-md border-2 border-slate-300 flex flex-col items-center justify-center transition">
+            <span class="text-[10px] text-slate-400 font-black">⬅️ -1</span>
+            <span id="neighborLeft" class="text-base sm:text-lg font-black text-slate-700">--</span>
+          </div>
+
+          <!-- 右方鄰居 (+1) -->
+          <div class="absolute right-2 w-14 h-14 bg-white rounded-xl shadow-md border-2 border-slate-300 flex flex-col items-center justify-center transition">
+            <span class="text-[10px] text-slate-400 font-black">➡️ +1</span>
+            <span id="neighborRight" class="text-base sm:text-lg font-black text-slate-700">--</span>
+          </div>
+
+          <!-- 中央目標格 (當前選取的未知數) -->
+          <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl shadow-lg border-3 border-amber-600 flex flex-col items-center justify-center z-10 animate-pulse">
+            <span class="text-[10px] text-amber-100 font-extrabold">目標神探</span>
+            <span id="neighborCenter" class="text-2xl font-black text-white">?</span>
+          </div>
+        </div>
+
+        <p class="text-xs text-amber-800 font-bold mt-2 text-center" id="crossTip">
+          「往右走多 1、往左走少 1；往下走多 10、往上走少 10！」
+        </p>
+      </div>
+
+      <!-- 數字鍵盤輸入作答區 -->
+      <div class="bg-white rounded-3xl p-4 shadow-lg border-3 border-amber-300 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-black text-slate-700">⌨️ 填入神秘數字：</span>
+          <!-- 輸入預覽框 -->
+          <div class="bg-slate-100 px-4 py-1.5 rounded-xl border-2 border-slate-300 font-black text-xl text-slate-800 min-w-[70px] text-center" id="inputDisplay">
+            _
+          </div>
+        </div>
+
+        <!-- 虛擬數字鍵盤 (適合電子白板大觸控) -->
+        <div class="grid grid-cols-3 gap-2 mt-1">
+          <button onclick="pressKey('1')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">1</button>
+          <button onclick="pressKey('2')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">2</button>
+          <button onclick="pressKey('3')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">3</button>
+          <button onclick="pressKey('4')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">4</button>
+          <button onclick="pressKey('5')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">5</button>
+          <button onclick="pressKey('6')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">6</button>
+          <button onclick="pressKey('7')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">7</button>
+          <button onclick="pressKey('8')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">8</button>
+          <button onclick="pressKey('9')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">9</button>
+          <button onclick="pressKey('clear')" class="py-3 bg-rose-50 hover:bg-rose-100 border-2 border-rose-200 rounded-xl font-black text-base text-rose-700 shadow-sm active:scale-95 transition">清除</button>
+          <button onclick="pressKey('0')" class="py-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-xl font-black text-xl text-amber-900 shadow-sm active:scale-95 transition">0</button>
+          <button onclick="pressKey('back')" class="py-3 bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 rounded-xl font-black text-base text-slate-700 shadow-sm active:scale-95 transition">⌫</button>
+        </div>
+
+        <!-- 驗證提交按鈕 -->
+        <button id="submitAnswerBtn" onclick="checkAnswer()" class="w-full mt-2 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black text-lg rounded-2xl shadow-md border-b-4 border-green-800 active:translate-y-1 active:border-b-0 transition flex items-center justify-center gap-2">
+          <span>✨ 填入並驗證解答！</span>
+        </button>
+      </div>
+
+      <!-- 快速抽題按鈕 -->
+      <button onclick="selectRandomEmptyCell()" class="py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-sm shadow-md border-b-3 border-amber-700 flex items-center justify-center gap-2 active:scale-98 transition">
+        <span>🎲 隨機指定下一個挑戰空格</span>
+      </button>
+
+    </div>
+  </main>
+
+  <!-- 答對觸發之「魔法蓋牌翻轉小遊戲」彈窗 (全班加分獎勵) -->
+  <div id="magicModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <div class="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border-4 border-amber-400 flex flex-col items-center relative text-center">
+      
+      <div class="inline-block bg-amber-500 text-white px-4 py-1 rounded-full font-black text-sm mb-1 shadow">
+        🎉 太神了！推算出正確數字！
+      </div>
+      <h3 class="text-2xl sm:text-3xl font-black text-amber-950 mt-1 mb-2">
+        🌟 幸運魔法卡：翻牌抽大獎！
+      </h3>
+      <p id="magicPrompt" class="text-sm font-bold text-amber-800 mb-4">
+        👀 卡片正在亮相記憶中... 準備洗牌！
+      </p>
+
+      <!-- 6 張魔法蓋牌網格 -->
+      <div id="cardsGrid" class="grid grid-cols-3 gap-3 sm:gap-4 w-full my-2 perspective-1000">
+        <!-- 由 JavaScript 動態生成卡牌 -->
+      </div>
+
+      <!-- 抽牌結果說明 -->
+      <div id="rewardResultBox" class="mt-4 p-3 bg-white rounded-2xl border-2 border-amber-300 w-full hidden">
+        <h4 id="rewardTitle" class="text-lg font-black text-amber-900">獲得獎勵！</h4>
+        <p id="rewardDesc" class="text-sm font-bold text-slate-600 mt-0.5">全班總星數增加囉！</p>
+        <button onclick="closeMagicModal()" class="mt-3 px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-base shadow active:scale-95 transition">
+          繼續探索百數表 🚀
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ==================== 1. 純 Web Audio API 歡樂音效與音樂 ==================== */
+let audioCtx = null;
+let isAudioInited = false;
+let sfxEnabled = true;
+let bgmEnabled = false;
+let bgmInterval = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    isAudioInited = true;
+  }
+}
+
+function playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.15) {
+  if (!sfxEnabled) return;
+  try {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e){}
+}
+
+function playCorrectSound() {
+  playTone(523.25, 'triangle', 0.12, 0.2); // C5
+  setTimeout(() => playTone(659.25, 'triangle', 0.12, 0.2), 100); // E5
+  setTimeout(() => playTone(783.99, 'triangle', 0.15, 0.2), 200); // G5
+  setTimeout(() => playTone(1046.5, 'triangle', 0.25, 0.25), 300); // C6
+}
+
+function playWrongSound() {
+  playTone(330, 'sawtooth', 0.15, 0.2);
+  setTimeout(() => playTone(220, 'sawtooth', 0.25, 0.2), 140);
+}
+
+function playPopSound() {
+  playTone(440, 'sine', 0.08, 0.15);
+}
+
+function playFlipSound() {
+  playTone(880, 'sine', 0.06, 0.1);
+}
+
+// 輕快五聲音階 BGM (不吵鬧、純真兒歌跳躍節奏)
+const melody = [523.25, 587.33, 659.25, 783.99, 880.00, 783.99, 659.25, 587.33];
+let noteIdx = 0;
+function startBGM() {
+  if (bgmInterval) clearInterval(bgmInterval);
+  bgmInterval = setInterval(() => {
+    if (!bgmEnabled) return;
+    try {
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(melody[noteIdx % melody.length], audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.25);
+      noteIdx++;
+    } catch(e){}
+  }, 320);
+}
+
+function toggleBGM() {
+  initAudio();
+  bgmEnabled = !bgmEnabled;
+  const btn = document.getElementById('bgmToggleBtn');
+  if (bgmEnabled) {
+    btn.innerText = "🎵 音樂: 開";
+    btn.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-300');
+    startBGM();
+  } else {
+    btn.innerText = "🎵 音樂: 關";
+    btn.classList.remove('bg-amber-100', 'text-amber-800', 'border-amber-300');
+    if (bgmInterval) clearInterval(bgmInterval);
+  }
+}
+
+function toggleSFX() {
+  sfxEnabled = !sfxEnabled;
+  const btn = document.getElementById('sfxToggleBtn');
+  btn.innerText = sfxEnabled ? "🔊 音效: 開" : "🔇 音效: 關";
+}
+
+/* ==================== 2. 百數表教材資料定義 ==================== */
+// 表一：1~100 (已給出 PDF 預設：1~10, 11, 20, 32, 40, 45, 49, 83, 88, 94, 96, 100 等)
+const defaultGiven100 = new Set([
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  11, 20,
+  32, 40,
+  45, 49,
+  83, 88,
+  94, 96, 100
+]);
+
+// 表二：91~200 (已給出 PDF 預設：91, 94, 99, 120, 133, 148, 151, 165, 177, 195 等)
+const defaultGiven200 = new Set([
+  91, 94, 99,
+  120,
+  133,
+  148,
+  151,
+  165,
+  177,
+  195
+]);
+
+let currentMode = '1-100'; // '1-100' or '91-200'
+let currentStartNum = 1;
+let currentGivenSet = defaultGiven100;
+let userSolvedSet = new Set();
+let selectedCellIndex = null; // 0 ~ 99
+let showAllAnswers = false;
+let classScore = 0;
+let consecutiveSuccessCount = 0;
+let isCruising = false; // 放大鏡游移中旗標
+
+/* ==================== 3. 百數表渲染與十字窗架聯動 ==================== */
+function switchTableMode(mode) {
+  initAudio();
+  currentMode = mode;
+  selectedCellIndex = null;
+  userSolvedSet.clear();
+  currentInput = "";
+  updateInputDisplay();
+  hideMagnifier();
+
+  const btn100 = document.getElementById('btnTable100');
+  const btn200 = document.getElementById('btnTable200');
+
+  if (mode === '1-100') {
+    currentStartNum = 1;
+    currentGivenSet = defaultGiven100;
+    btn100.className = "px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition bg-amber-500 text-white shadow-sm";
+    btn200.className = "px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition text-amber-800 hover:bg-amber-200";
+  } else {
+    currentStartNum = 91;
+    currentGivenSet = defaultGiven200;
+    btn200.className = "px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition bg-amber-500 text-white shadow-sm";
+    btn100.className = "px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition text-amber-800 hover:bg-amber-200";
+  }
+
+  renderGrid();
+  updateCrossInspector();
+}
+
+function getNumAt(idx) {
+  return currentStartNum + idx;
+}
+
+function renderGrid() {
+  const container = document.getElementById('gridContainer');
+  container.innerHTML = '';
+
+  for (let i = 0; i < 100; i++) {
+    const val = getNumAt(i);
+    const isGiven = currentGivenSet.has(val);
+    const isSolved = userSolvedSet.has(val);
+    const isSelected = (selectedCellIndex === i);
+
+    const cell = document.createElement('div');
+    cell.id = `cell-${i}`;
+    cell.dataset.index = i;
+
+    // 基本造型
+    let baseClasses = "grid-cell rounded-lg sm:rounded-xl flex items-center justify-center font-black text-sm sm:text-lg cursor-pointer border shadow-sm relative ";
+
+    if (isSelected) {
+      baseClasses += "bg-amber-300 border-amber-600 text-amber-950 ring-4 ring-orange-500 z-10 scale-105 ";
+    } else if (isGiven) {
+      // 預設已給出的數字（柔和灰藍/奶油色底）
+      baseClasses += "bg-amber-100 border-amber-200 text-amber-900 ";
+    } else if (isSolved) {
+      // 學生成功填入的數字（亮眼薄荷綠）
+      baseClasses += "bg-emerald-400 border-emerald-500 text-white shadow-md ";
+    } else {
+      // 待填寫的空格
+      baseClasses += "bg-white border-amber-200 hover:bg-amber-50 text-slate-300 ";
+    }
+
+    cell.className = baseClasses;
+
+    // 內容顯示判斷
+    if (isGiven || isSolved || showAllAnswers) {
+      cell.innerText = val;
+      if (showAllAnswers && !isGiven && !isSolved) {
+        cell.classList.add('text-indigo-400', 'bg-indigo-50');
+      }
+    } else {
+      cell.innerText = "";
+    }
+
+    // 點擊選取事件
+    cell.onclick = () => {
+      selectCell(i);
+      moveMagnifierToCell(i);
+    };
+
+    container.appendChild(cell);
+  }
+}
+
+function selectCell(idx) {
+  initAudio();
+  playPopSound();
+  selectedCellIndex = idx;
+  currentInput = "";
+  updateInputDisplay();
+  renderGrid();
+  updateCrossInspector();
+}
+
+/* ==================== 放大鏡游移巡邏核心邏輯 ==================== */
+function moveMagnifierToCell(idx) {
+  const cell = document.getElementById(`cell-${idx}`);
+  const wrapper = document.getElementById('boardWrapper');
+  const glass = document.getElementById('roamingGlass');
+  if (!cell || !wrapper || !glass) return;
+
+  const cellRect = cell.getBoundingClientRect();
+  const wrapRect = wrapper.getBoundingClientRect();
+
+  const centerX = (cellRect.left + cellRect.width / 2) - wrapRect.left;
+  const centerY = (cellRect.top + cellRect.height / 2) - wrapRect.top;
+
+  glass.style.opacity = '1';
+  glass.style.transform = `translate(${centerX}px, ${centerY}px) translate(-50%, -50%)`;
+}
+
+function hideMagnifier() {
+  const glass = document.getElementById('roamingGlass');
+  if (glass) glass.style.opacity = '0';
+}
+
+function triggerMagnifierCruise() {
+  if (isCruising) return;
+  initAudio();
+  
+  const emptyIndices = [];
+  for (let i = 0; i < 100; i++) {
+    const val = getNumAt(i);
+    if (!currentGivenSet.has(val) && !userSolvedSet.has(val)) {
+      emptyIndices.push(i);
+    }
+  }
+  if (emptyIndices.length === 0) {
+    alert("🎉 太精彩了！這張百數表全部填寫完成囉！");
+    return;
+  }
+
+  isCruising = true;
+  const cruiseBtn = document.getElementById('cruiseBtn');
+  cruiseBtn.classList.add('opacity-50', 'pointer-events-none');
+
+  // 隨機在百數表上空游移 3~4 個點，最後精準定格在隨機空格上！
+  const targetIdx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+  let step = 0;
+  const totalSteps = 4;
+
+  const cruiseInterval = setInterval(() => {
+    step++;
+    playTone(500 + step * 80, 'sine', 0.08, 0.12);
+    if (step < totalSteps) {
+      // 隨機飛舞中途點
+      const randomIdx = Math.floor(Math.random() * 100);
+      moveMagnifierToCell(randomIdx);
+    } else {
+      clearInterval(cruiseInterval);
+      // 最終定格在目標空格！
+      selectCell(targetIdx);
+      moveMagnifierToCell(targetIdx);
+      playCorrectSound();
+      isCruising = false;
+      cruiseBtn.classList.remove('opacity-50', 'pointer-events-none');
+    }
+  }, 420);
+}
+
+function updateCrossInspector() {
+  const upEl = document.getElementById('neighborUp');
+  const downEl = document.getElementById('neighborDown');
+  const leftEl = document.getElementById('neighborLeft');
+  const rightEl = document.getElementById('neighborRight');
+  const centerEl = document.getElementById('neighborCenter');
+  const coordLabel = document.getElementById('targetCoordLabel');
+
+  if (selectedCellIndex === null) {
+    upEl.innerText = "--";
+    downEl.innerText = "--";
+    leftEl.innerText = "--";
+    rightEl.innerText = "--";
+    centerEl.innerText = "?";
+    coordLabel.innerText = "請點選百數表格子";
+    return;
+  }
+
+  const row = Math.floor(selectedCellIndex / 10);
+  const col = selectedCellIndex % 10;
+  const targetVal = getNumAt(selectedCellIndex);
+  coordLabel.innerText = `第 ${row + 1} 列，第 ${col + 1} 行`;
+
+  // 判斷中心是否已解開
+  const isRevealed = currentGivenSet.has(targetVal) || userSolvedSet.has(targetVal) || showAllAnswers;
+  centerEl.innerText = isRevealed ? targetVal : "?";
+
+  // 上方 (row - 1)
+  if (row > 0) {
+    const v = targetVal - 10;
+    upEl.innerText = (currentGivenSet.has(v) || userSolvedSet.has(v) || showAllAnswers) ? v : `(${v})`;
+    upEl.classList.remove('text-slate-300');
+    upEl.classList.add('text-slate-700');
+  } else {
+    upEl.innerText = "頂部";
+    upEl.classList.add('text-slate-300');
+  }
+
+  // 下方 (row + 1)
+  if (row < 9) {
+    const v = targetVal + 10;
+    downEl.innerText = (currentGivenSet.has(v) || userSolvedSet.has(v) || showAllAnswers) ? v : `(${v})`;
+    downEl.classList.remove('text-slate-300');
+    downEl.classList.add('text-slate-700');
+  } else {
+    downEl.innerText = "底部";
+    downEl.classList.add('text-slate-300');
+  }
+
+  // 左方 (col - 1)
+  if (col > 0) {
+    const v = targetVal - 1;
+    leftEl.innerText = (currentGivenSet.has(v) || userSolvedSet.has(v) || showAllAnswers) ? v : `(${v})`;
+    leftEl.classList.remove('text-slate-300');
+    leftEl.classList.add('text-slate-700');
+  } else {
+    leftEl.innerText = "最左";
+    leftEl.classList.add('text-slate-300');
+  }
+
+  // 右方 (col + 1)
+  if (col < 9) {
+    const v = targetVal + 1;
+    rightEl.innerText = (currentGivenSet.has(v) || userSolvedSet.has(v) || showAllAnswers) ? v : `(${v})`;
+    rightEl.classList.remove('text-slate-300');
+    rightEl.classList.add('text-slate-700');
+  } else {
+    rightEl.innerText = "最右";
+    rightEl.classList.add('text-slate-300');
+  }
+}
+
+function selectRandomEmptyCell() {
+  triggerMagnifierCruise();
+}
+
+function toggleAllAnswers() {
+  initAudio();
+  showAllAnswers = !showAllAnswers;
+  const btn = document.getElementById('showAnswersBtn');
+  btn.innerText = showAllAnswers ? "👁️ 教師解答: 顯示中" : "👁️ 教師解答: 隱藏";
+  renderGrid();
+  updateCrossInspector();
+}
+
+/* ==================== 4. 虛擬鍵盤與填答驗證 ==================== */
+let currentInput = "";
+
+function pressKey(key) {
+  initAudio();
+  playPopSound();
+  if (key === 'clear') {
+    currentInput = "";
+  } else if (key === 'back') {
+    currentInput = currentInput.slice(0, -1);
+  } else {
+    if (currentInput.length < 3) {
+      currentInput += key;
+    }
+  }
+  updateInputDisplay();
+}
+
+function updateInputDisplay() {
+  const display = document.getElementById('inputDisplay');
+  display.innerText = currentInput === "" ? "_" : currentInput;
+}
+
+function checkAnswer() {
+  initAudio();
+  if (selectedCellIndex === null) {
+    alert("請先點選百數表中想要挑戰的空格喔！");
+    return;
+  }
+  if (currentInput === "") {
+    alert("請先用數字鍵盤輸入推算出來的數字！");
+    return;
+  }
+
+  const inputNum = parseInt(currentInput, 10);
+  const correctVal = getNumAt(selectedCellIndex);
+
+  if (inputNum === correctVal) {
+    // 答對！
+    playCorrectSound();
+    userSolvedSet.add(correctVal);
+    classScore += 10;
+    consecutiveSuccessCount++;
+    document.getElementById('scoreText').innerText = classScore;
+
+    renderGrid();
+    updateCrossInspector();
+    if (selectedCellIndex !== null) {
+      moveMagnifierToCell(selectedCellIndex);
+    }
+
+    // 檢查是否觸發「幸運魔法蓋牌」小遊戲（每答對 3 格解鎖一次獎勵！）
+    if (consecutiveSuccessCount % 3 === 0) {
+      setTimeout(() => {
+        openMagicCardGame();
+      }, 500);
+    } else {
+      currentInput = "";
+      updateInputDisplay();
+    }
+  } else {
+    // 答錯溫和提示
+    playWrongSound();
+    alert(`💡 再仔細看一眼十字窗架喔！\n你的答案是 ${inputNum}，請想想看上下是相差 10、左右是相差 1 喔！`);
+  }
+}
+
+/* ==================== 5. 幸運魔法蓋牌小遊戲 ==================== */
+const cardPrizes = [
+  { text: "+10 🌟", bonus: 10, name: "星星大禮包" },
+  { text: "+20 🌟", bonus: 20, name: "雙倍幸運星" },
+  { text: "+15 🌟", bonus: 15, name: "神探能量石" },
+  { text: "🍀 翻倍 x2", double: true, name: "神奇雙倍幸運草" },
+  { text: "🎁 再抽一次", retry: true, name: "神祕探險寶箱" },
+  { text: "+5 🌟", bonus: 5, name: "小小勇者獎" }
+];
+
+let shuffledCards = [];
+let isCardPickable = false;
+
+function openMagicCardGame() {
+  const modal = document.getElementById('magicModal');
+  const prompt = document.getElementById('magicPrompt');
+  const resultBox = document.getElementById('rewardResultBox');
+  const grid = document.getElementById('cardsGrid');
+
+  resultBox.classList.add('hidden');
+  modal.classList.remove('hidden');
+  isCardPickable = false;
+  prompt.innerText = "👀 卡片正在亮相記憶中... 準備洗牌！";
+
+  // 洗牌獎項
+  shuffledCards = [...cardPrizes].sort(() => Math.random() - 0.5);
+
+  grid.innerHTML = "";
+  shuffledCards.forEach((prize, idx) => {
+    const card = document.createElement('div');
+    card.className = "card w-full h-28 sm:h-32 relative cursor-pointer";
+    card.id = `card-${idx}`;
+    card.innerHTML = `
+      <div class="card-inner w-full h-full relative rounded-2xl shadow-lg border-2 border-amber-300">
+        <!-- 正面（獎項） -->
+        <div class="card-face w-full h-full absolute inset-0 bg-white rounded-2xl flex flex-col items-center justify-center p-2 text-amber-900 font-black">
+          <span class="text-xl sm:text-2xl">${prize.text}</span>
+          <span class="text-xs text-amber-700 mt-1">${prize.name}</span>
+        </div>
+        <!-- 背面（覆蓋卡背） -->
+        <div class="card-face card-back w-full h-full absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-inner border-2 border-amber-300">
+          ❓
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // 亮相 2.5 秒後翻面蓋牌並洗牌
+  setTimeout(() => {
+    playFlipSound();
+    document.querySelectorAll('.card-inner').forEach(inner => {
+      inner.classList.add('card-flipped');
+    });
+    prompt.innerText = "🔄 旋轉洗牌中... 請全班鎖定你的幸運卡牌！";
+
+    // 模擬動態交換洗牌動畫
+    setTimeout(() => {
+      prompt.innerText = "👉 請派一位神探上台翻開一張魔法卡！";
+      isCardPickable = true;
+
+      // 綁定點擊翻牌
+      shuffledCards.forEach((prize, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        card.onclick = () => pickCard(idx);
+      });
+    }, 1200);
+
+  }, 2200);
+}
+
+function pickCard(chosenIdx) {
+  if (!isCardPickable) return;
+  isCardPickable = false;
+  initAudio();
+  playCorrectSound();
+
+  const chosenCard = document.getElementById(`card-${chosenIdx}`);
+  const cardInners = document.querySelectorAll('.card-inner');
+  cardInners[chosenIdx].classList.remove('card-flipped');
+
+  const prize = shuffledCards[chosenIdx];
+  const resultBox = document.getElementById('rewardResultBox');
+  const title = document.getElementById('rewardTitle');
+  const desc = document.getElementById('rewardDesc');
+
+  if (prize.bonus) {
+    classScore += prize.bonus;
+    title.innerText = `🎉 恭喜抽中【${prize.name}】！`;
+    desc.innerText = `全班額外獲得 ${prize.bonus} 顆星星！大家太厲害了！`;
+  } else if (prize.double) {
+    classScore = classScore * 2;
+    title.innerText = `🍀 恭喜抽中【神奇雙倍幸運草】！`;
+    desc.innerText = `全班總星數直接翻倍！歡呼一聲！`;
+  } else if (prize.retry) {
+    title.innerText = `🎁 恭喜抽中【神祕寶箱】！`;
+    desc.innerText = `額外加贈 15 顆星，並且手氣超旺！`;
+    classScore += 15;
+  }
+
+  document.getElementById('scoreText').innerText = classScore;
+
+  // 1 秒後全部揭曉
+  setTimeout(() => {
+    cardInners.forEach(inner => inner.classList.remove('card-flipped'));
+    resultBox.classList.remove('hidden');
+  }, 800);
+}
+
+function closeMagicModal() {
+  initAudio();
+  document.getElementById('magicModal').classList.add('hidden');
+  currentInput = "";
+  updateInputDisplay();
+}
+
+/* ==================== 6. 電子白板手寫塗鴉畫布 Canvas ==================== */
+const canvas = document.getElementById('paintCanvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let currentPenColor = '#EF4444';
+let currentLineWidth = 4;
+let isEraserMode = false;
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+}
+window.addEventListener('resize', resizeCanvas);
+
+function setPenColor(color, width = 4, alpha = 1.0) {
+  initAudio();
+  isEraserMode = false;
+  currentPenColor = color;
+  currentLineWidth = width;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = alpha;
+}
+
+function setEraser() {
+  initAudio();
+  isEraserMode = true;
+  currentLineWidth = 20;
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.globalAlpha = 1.0;
+}
+
+function clearCanvas() {
+  initAudio();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// 支援滑鼠與觸控事件
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  if (e.touches && e.touches.length > 0) {
+    return {
+      x: e.touches[0].clientX - rect.left,
+      y: e.touches[0].clientY - rect.top
+    };
+  }
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+let startPos = null;
+
+function startDraw(e) {
+  initAudio();
+  isDrawing = true;
+  startPos = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(startPos.x, startPos.y);
+  ctx.strokeStyle = currentPenColor;
+  ctx.lineWidth = currentLineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+
+function drawing(e) {
+  if (!isDrawing) return;
+  const pos = getPos(e);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.stroke();
+}
+
+function stopDraw(e) {
+  if (!isDrawing) return;
+  isDrawing = false;
+  
+  // 若僅是短暫點擊且位移極小，視為點選格子！
+  const endPos = getPos(e.changedTouches ? e.changedTouches[0] : e);
+  const dist = Math.hypot(endPos.x - startPos.x, endPos.y - startPos.y);
+  if (dist < 8) {
+    // 依據坐標計算點擊的是哪一個 cell
+    const cellW = canvas.width / 10;
+    const cellH = canvas.height / 10;
+    const col = Math.floor(endPos.x / cellW);
+    const row = Math.floor(endPos.y / cellH);
+    if (col >= 0 && col < 10 && row >= 0 && row < 10) {
+      const idx = row * 10 + col;
+      selectCell(idx);
+      moveMagnifierToCell(idx);
+    }
+  }
+}
+
+// 綁定畫布事件
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', drawing);
+canvas.addEventListener('mouseup', stopDraw);
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  startDraw(e);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  drawing(e);
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  stopDraw(e);
+}, { passive: false });
+
+/* ==================== 鍵盤實體按鍵支援 ==================== */
+window.addEventListener('keydown', (e) => {
+  if (e.key >= '0' && e.key <= '9') {
+    pressKey(e.key);
+  } else if (e.key === 'Backspace') {
+    pressKey('back');
+  } else if (e.key === 'Enter') {
+    checkAnswer();
+  }
+});
+
+// 初始化載入
+window.onload = () => {
+  resizeCanvas();
+  renderGrid();
+  updateCrossInspector();
+};
+window.addEventListener('resize', () => {
+  if (selectedCellIndex !== null) {
+    moveMagnifierToCell(selectedCellIndex);
+  }
+});
+</script>
+</body>
+</html>
